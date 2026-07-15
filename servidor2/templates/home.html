@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Estadísticas de Contenido</title>
+
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Estadísticas de videos</h1>
+        </header>
+        
+        <div class="buttons-wrapper">
+            <button class="filter-btn active" onclick="filterMetric('all')">Todos</button>
+            <button class="filter-btn" onclick="filterMetric('most-viewed')">Video Más Visto</button>
+            <button class="filter-btn" onclick="filterMetric('most-liked')">Más Likes</button>
+            <button class="filter-btn" onclick="filterMetric('most-commented')">Más Comentado</button>
+            <button class="filter-btn" onclick="filterMetric('recurring-user')">Usuario Más Recurrente</button>
+            <button class="filter-btn" onclick="filterMetric('peak-time')">Hora Pico</button>
+            <button class="filter-btn" onclick="filterMetric('best-ratio')">Mejor Ratio</button>
+        </div>
+        
+        <div class="table-wrapper">
+            <table id="metricsTable">
+                <thead>
+                    <tr>
+                        <th>usuario</th>
+                        <th>accion</th>
+                        <th>fecha</th>
+                        <th>hora</th>
+                        <th>short</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr data-metric="most-viewed">
+                        
+                    </tr>
+
+                    <tr data-metric="most-liked">
+                        
+                    </tr>
+
+                    <tr data-metric="most-commented">
+                        
+                    </tr>
+
+                    <tr data-metric="recurring-user">
+                        
+                    </tr>
+
+                    <tr data-metric="peak-time">
+
+                    </tr>
+                    
+                    <tr data-metric="best-ratio">
+
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <script>
+        function filterMetric(metric) {
+            const buttons = document.querySelectorAll('.filter-btn');
+            const rows = document.querySelectorAll('#metricsTable tbody tr');
+            
+            buttons.forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            rows.forEach(row => {
+                if (metric === 'all') {
+                    row.style.display = '';
+                } else {
+                    row.style.display = row.dataset.metric === metric ? '' : 'none';
+                }
+            });
+        }
+    </script>
+</body>
+</html>

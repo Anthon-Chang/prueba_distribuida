@@ -11,147 +11,181 @@ def get_db():
         host="mysql_principal",
         user="root",
         password="root",
-        database="tareas_db",
+        database="examenad",
         charset="utf8mb4",
         collation="utf8mb4_unicode_ci",
         use_unicode=True
     )
 
-# ── CRUD: Estudiantes ─────────────────────────────────────────
-def buscar_estudiante(cedula, password):
+# ── CRUD: Usuarios ────────────────────────────────────────────
+def buscar_usuario(cedula, password):
     db = get_db()
     cur = db.cursor(dictionary=True)
     cur.execute(
-        "SELECT id, nombre FROM estudiantes WHERE cedula=%s AND password=%s",
+        "SELECT id, nombre FROM usuarios WHERE cedula=%s AND password=%s",
         (cedula, password)
     )
     resultado = cur.fetchone()
     cur.close(); db.close()
     return resultado
 
-# ── CRUD: Tareas ──────────────────────────────────────────────
-def obtener_tareas(estudiante_id):
+# ── CRUD: Videos ──────────────────────────────────────────────
+def obtener_videos():
     db = get_db()
     cur = db.cursor(dictionary=True)
     cur.execute("""
-        SELECT t.id, t.codigo, t.titulo, t.descripcion, t.fecha_limite,
-               e.id AS entrega_id, e.respuesta, e.fecha_entrega
-        FROM tareas t
-        LEFT JOIN entregas e
-               ON e.tarea_id = t.id AND e.estudiante_id = %s
-        ORDER BY t.fecha_limite ASC
-    """, (estudiante_id,))
-    tareas = cur.fetchall()
+        SELECT id, codigo, titulo, descripcion, views, likes, shares, fecha_publicacion
+        FROM videos
+        ORDER BY views DESC
+    """)
+    videos = cur.fetchall()
     cur.close(); db.close()
-    return tareas
+    return videos
 
-def obtener_tarea(tarea_id):
-    db = get_db()
-    cur = db.cursor(dictionary=True)
-    cur.execute("SELECT * FROM tareas WHERE id=%s", (tarea_id,))
-    tarea = cur.fetchone()
-    cur.close(); db.close()
-    return tarea
-
-# ── CRUD: Entregas ────────────────────────────────────────────
-def buscar_entrega(tarea_id, estudiante_id):
-    db = get_db()
-    cur = db.cursor(dictionary=True)
-    cur.execute(
-        "SELECT * FROM entregas WHERE tarea_id=%s AND estudiante_id=%s",
-        (tarea_id, estudiante_id)
-    )
-    entrega = cur.fetchone()
-    cur.close(); db.close()
-    return entrega
-
-def guardar_entrega(tarea_id, estudiante_id, respuesta):
-    db = get_db()
-    cur = db.cursor()
-    cur.execute(
-        "INSERT INTO entregas (tarea_id, estudiante_id, respuesta, fecha_entrega) VALUES (%s,%s,%s,%s)",
-        (tarea_id, estudiante_id, respuesta, datetime.now())
-    )
-    db.commit()
-    cur.close(); db.close()
-
-def obtener_mis_entregas(estudiante_id):
+def obtener_video(video_id):
     db = get_db()
     cur = db.cursor(dictionary=True)
     cur.execute("""
-        SELECT t.codigo, t.titulo, e.respuesta, e.fecha_entrega
-        FROM entregas e JOIN tareas t ON t.id = e.tarea_id
-        WHERE e.estudiante_id = %s
-        ORDER BY e.fecha_entrega DESC
-    """, (estudiante_id,))
-    entregas = cur.fetchall()
+        SELECT v.id, v.codigo, v.titulo, v.descripcion, v.views, v.likes, v.shares, v.fecha_publicacion,
+               COALESCE(c.comments, 0) AS comments
+        FROM videos v
+        LEFT JOIN (
+            SELECT video_id, COUNT(*) AS comments
+            FROM comentarios
+            GROUP BY video_id
+        ) c ON c.video_id = v.id
+        WHERE v.id=%s
+    """, (video_id,))
+    video = cur.fetchone()
     cur.close(); db.close()
-    return entregas
+    return video
+
+def obtener_video_mas_visto():
+    db = get_db()
+    cur = db.cursor(dictionary=True)
+    cur.execute("""
+        SELECT short AS titulo, COUNT(*) AS views
+        FROM redes
+        WHERE LOWER(accion) = 'view'
+        GROUP BY short
+        ORDER BY views DESC
+        LIMIT 1
+    """)
+    resultado = cur.fetchone()
+    cur.close(); db.close()
+    return resultado
+
+def obtener_video_con_mas_likes():
+    db = get_db()
+    cur = db.cursor(dictionary=True)
+    cur.execute("""
+        SELECT short AS titulo, COUNT(*) AS likes
+        FROM redes
+        WHERE LOWER(accion) IN ('like', 'likes')
+        GROUP BY short
+        ORDER BY likes DESC
+        LIMIT 1
+    """)
+    resultado = cur.fetchone()
+    cur.close(); db.close()
+    return resultado
+
+def obtener_video_mas_comentado():
+    db = get_db()
+    cur = db.cursor(dictionary=True)
+    cur.execute("""
+        SELECT short AS titulo, COUNT(*) AS comentarios
+        FROM redes
+        WHERE LOWER(accion) IN ('comment', 'comments')
+        GROUP BY short
+        ORDER BY comentarios DESC
+        LIMIT 1
+    """)
+    resultado = cur.fetchone()
+    cur.close(); db.close()
+    return resultado
+
+def obtener_usuario_mas_recurrente():
+    db = get_db()
+    cur = db.cursor(dictionary=True)
+    cur.execute("""
+        SELECT usuario AS nombre, COUNT(*) AS total
+        FROM redes
+        GROUP BY usuario
+        ORDER BY total DESC
+        LIMIT 1
+    """)
+    resultado = cur.fetchone()
+    cur.close(); db.close()
+    return resultado
+
+def obtener_hora_mas_interaccion():
+    db = get_db()
+    cur = db.cursor(dictionary=True)
+    cur.execute("""
+        SELECT hora, total
+        FROM (
+            SELECT CONCAT(SUBSTRING_INDEX(hora, ':', 1), ':00') AS hora, COUNT(*) AS total
+            FROM redes
+            GROUP BY SUBSTRING_INDEX(hora, ':', 1)
+        ) x
+        ORDER BY total DESC
+        LIMIT 1
+    """)
+    resultado = cur.fetchone()
+    cur.close(); db.close()
+    return resultado
+
+def obtener_video_mejor_ratio_interaccion():
+    db = get_db()
+    cur = db.cursor(dictionary=True)
+    cur.execute("""
+        SELECT short AS titulo,
+               SUM(CASE WHEN LOWER(accion) IN ('like', 'likes') THEN 1 ELSE 0 END) AS likes,
+               SUM(CASE WHEN LOWER(accion) IN ('comment', 'comments') THEN 1 ELSE 0 END) AS comments,
+               SUM(CASE WHEN LOWER(accion) IN ('share', 'shares') THEN 1 ELSE 0 END) AS shares,
+               SUM(CASE WHEN LOWER(accion) = 'view' THEN 1 ELSE 0 END) AS views,
+               (
+                   (
+                       SUM(CASE WHEN LOWER(accion) IN ('like', 'likes') THEN 1 ELSE 0 END) +
+                       SUM(CASE WHEN LOWER(accion) IN ('comment', 'comments') THEN 1 ELSE 0 END) +
+                       SUM(CASE WHEN LOWER(accion) IN ('share', 'shares') THEN 1 ELSE 0 END)
+                   ) / NULLIF(SUM(CASE WHEN LOWER(accion) = 'view' THEN 1 ELSE 0 END), 0)
+               ) AS ratio
+        FROM redes
+        GROUP BY short
+        ORDER BY ratio DESC
+        LIMIT 1
+    """)
+    resultado = cur.fetchone()
+    cur.close(); db.close()
+    if resultado:
+        total_interacciones = resultado["likes"] + resultado["comments"] + resultado["shares"]
+        resultado["ratio_text"] = f"likes + comments + shares = {total_interacciones} / {resultado['views']}"
+    return resultado
+
+def obtener_estadisticas():
+    return {
+        "video_mas_visto": obtener_video_mas_visto(),
+        "video_mas_likeado": obtener_video_con_mas_likes(),
+        "video_mas_comentado": obtener_video_mas_comentado(),
+        "usuario_mas_recurrente": obtener_usuario_mas_recurrente(),
+        "hora_mas_interaccion": obtener_hora_mas_interaccion(),
+        "video_mejor_ratio": obtener_video_mejor_ratio_interaccion()
+    }
 
 # ── Rutas ─────────────────────────────────────────────────────
 @app.route("/")
 def index():
-    if "estudiante_id" not in session:
-        return redirect(url_for("login"))
-    return redirect(url_for("tareas"))
+    # Acceso sin login: mostrar directamente la página principal
+    estadisticas = obtener_estadisticas()
+    return render_template("home.html", estadisticas=estadisticas)
 
-@app.route("/login", methods=["GET","POST"])
-def login():
-    if request.method == "POST":
-        cedula   = request.form["cedula"]
-        password = request.form["password"]
-        est = buscar_estudiante(cedula, password)
-        if est:
-            session["estudiante_id"]     = est["id"]
-            session["estudiante_nombre"] = est["nombre"]
-            return redirect(url_for("tareas"))
-        flash("Cédula o contraseña incorrectos", "danger")
-    return render_template("login.html", nodo="Servidor 2")
-
-@app.route("/logout")
-def logout():
-    session.clear()
-    return redirect(url_for("login"))
-
-@app.route("/tareas")
-def tareas():
-    if "estudiante_id" not in session:
-        return redirect(url_for("login"))
-    lista = obtener_tareas(session["estudiante_id"])
-    return render_template("tareas.html", tareas=lista,
-                           ahora=datetime.now(), nodo="Servidor 2")
-
-@app.route("/entregar/<int:tarea_id>", methods=["GET","POST"])
-def entregar(tarea_id):
-    if "estudiante_id" not in session:
-        return redirect(url_for("login"))
-
-    tarea   = obtener_tarea(tarea_id)
-    entrega = buscar_entrega(tarea_id, session["estudiante_id"])
-    ahora   = datetime.now()
-
-    if request.method == "POST":
-        respuesta = request.form.get("respuesta","").strip()
-        if entrega:
-            flash("Ya entregaste esta tarea", "warning")
-        elif ahora > tarea["fecha_limite"]:
-            flash("El plazo de entrega ya venció", "danger")
-        elif not respuesta:
-            flash("La respuesta no puede estar vacía", "warning")
-        else:
-            guardar_entrega(tarea_id, session["estudiante_id"], respuesta)
-            flash("¡Tarea entregada!", "success")
-            return redirect(url_for("tareas"))
-
-    return render_template("entregar.html", tarea=tarea,
-                           entrega=entrega, ahora=ahora, nodo="Servidor 2")
-
-@app.route("/mis-entregas")
-def mis_entregas():
-    if "estudiante_id" not in session:
-        return redirect(url_for("login"))
-    entregas = obtener_mis_entregas(session["estudiante_id"])
-    return render_template("mis_entregas.html", entregas=entregas, nodo="Servidor 2")
+@app.route("/home")
+def home():
+    # Acceso sin login: mostrar estadísticas
+    estadisticas = obtener_estadisticas()
+    return render_template("home.html", estadisticas=estadisticas)
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)

@@ -1,7 +1,5 @@
-version: '3'
-
+version: "3.8"
 services:
-
   mysql_principal:
     container_name: Maestro1
     image: mysql:8.0
@@ -46,51 +44,47 @@ services:
     container_name: phpmyadmin
     image: phpmyadmin:latest
     ports:
-      - "8080:80"
+      - "8081:80"
     environment:
       PMA_HOSTS: "mysql_principal,mysql_secundario"
       PMA_ARBITRARY: 1
 
   servidor1:
-    build: .
-    volumes:
-      - .:/app
+    image: python:3.9-slim
+    build:
+      context: ./servidor1
+      dockerfile: Dockerfile
     container_name: ServidorWeb0001
     ports:
       - "5001:5000"
     depends_on:
       - mysql_principal
-    preparador:
-      condition: service_completed_successfully
-      command: python app.py
+    command: python app.py
 
   servidor2:
-    build: .
-    volumes:
-      - .:/app
+    image: python:3.9-slim
+    build:
+      context: ./servidor2
+      dockerfile: Dockerfile
     container_name: ServidorWeb0002
     ports:
       - "5002:5000"
     depends_on:
       - mysql_principal
-    preparador:
-      condition: service_completed_successfully
-      command: python app.py
+    command: python app.py
 
   reducer:
-    build: .
+    image: python:3.9-slim
+    working_dir: /app
     volumes:
       - .:/app
-    container_name: ServidorWeb0002
+    container_name: ServidorWeb0003
     ports:
-      - "5002:5000"
+      - "5003:5000"
     depends_on:
-      servidor1:
-        condition: service_completed_successfully
-      servidor2:
-        condition: service_completed_successfully
-    preparador:
-      command: python app.py
+      - servidor1
+      - servidor2
+    command: python app.py
 
   nginx:
     build:
@@ -102,6 +96,12 @@ services:
     depends_on:
       - servidor1
       - servidor2
+
+volumes:
+  master_datos:
+    driver: local
+  slave_datos:
+    driver: local
 
 
 
